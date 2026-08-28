@@ -72,9 +72,6 @@ void server_init(void);
 void server_rebind(void);
 void server_poll(void);
 void server_term(void);
-void ensure_save_directory_exists(void);
-void load_config(void);
-void save_config(void);
 
 void server_accept_incoming(void);
 void server_reject_incoming(void);

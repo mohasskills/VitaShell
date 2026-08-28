@@ -65,42 +65,7 @@ static int get_vita_ip(char *ip_out, size_t max_len) {
     return 0;
 }
 
-void ensure_save_directory_exists(void) {
-    sceIoMkdir("ux0:data", 0777);
-    sceIoMkdir("ux0:data/vitasend", 0777);
-    sceIoMkdir("ux0:data/vitasend/icons", 0777);
-    sceIoMkdir(save_destination, 0777);
-}
 
-void load_config(void) {
-    SceUID fd = sceIoOpen("ux0:data/vitasend/config.txt", SCE_O_RDONLY, 0777);
-    if (fd >= 0) {
-        char buf[256];
-        int len = sceIoRead(fd, buf, sizeof(buf) - 1);
-        if (len > 0) {
-            buf[len] = '\0';
-            // Trim newline
-            for (int i = 0; i < len; i++) {
-                if (buf[i] == '\r' || buf[i] == '\n') {
-                    buf[i] = '\0';
-                    break;
-                }
-            }
-            if (buf[0] != '\0') {
-                snprintf(save_destination, sizeof(save_destination), "%s", buf);
-            }
-        }
-        sceIoClose(fd);
-    }
-}
-
-void save_config(void) {
-    SceUID fd = sceIoOpen("ux0:data/vitasend/config.txt", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
-    if (fd >= 0) {
-        sceIoWrite(fd, save_destination, strlen(save_destination));
-        sceIoClose(fd);
-    }
-}
 
 // Helper to set socket to non-blocking
 static void set_nonblocking(int sock) {
@@ -154,9 +119,6 @@ void server_rebind(void) {
 
 void server_init(void) {
     memset(&current_session, 0, sizeof(current_session));
-    load_config();
-    ensure_save_directory_exists();
-
     if (vita_fingerprint[0] == '\0') {
         SceNetEtherAddr mac;
         if (sceNetGetMacAddress(&mac, 0) == 0) {
@@ -643,17 +605,6 @@ static int upload_thread_func(SceSize args, void *argp) {
         snprintf(server_status_msg, sizeof(server_status_msg),
                  "Done! Received %d file(s) from %s",
                  current_session.file_count, current_session.sender_alias);
-        
-        // Debug log to tell the user EXACTLY where it went
-        char logpath[512] = "ux0:data/vitasend_last_received.txt";
-        SceUID logfd = sceIoOpen(logpath, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
-        if (logfd >= 0) {
-            char logmsg[1024];
-            snprintf(logmsg, sizeof(logmsg), "Last file was saved to: %s/%s\nFile size: %d bytes\n", save_destination, active_upload.safe_name, (int)active_upload.bytes_written);
-            sceIoWrite(logfd, logmsg, strlen(logmsg));
-            sceIoClose(logfd);
-        }
-
         current_session.is_active = 0;
     } else if (active_upload.cancel_requested) {
         snprintf(server_status_msg, sizeof(server_status_msg), "Cancelled by sender");
@@ -720,8 +671,6 @@ static void start_upload(int client_sock, const char *url_path, const char *head
     if (te_header && strstr(te_header, "chunked") != NULL) {
         is_chunked = 1;
     }
-
-    ensure_save_directory_exists();
 
     // Build the state (memset first so safe_name gets stored correctly)
     memset(&active_upload, 0, sizeof(active_upload));
