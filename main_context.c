@@ -30,6 +30,9 @@
 #include "utils.h"
 #include "usb.h"
 #include "pfs.h"
+#include "localsend_dialog.h"
+
+int added_mark = 0;
 
 enum MenuHomeEntrys {
   MENU_HOME_ENTRY_REFRESH_LIVEAREA,
@@ -76,6 +79,7 @@ enum MenuMainEntrys {
   MENU_MAIN_ENTRY_SORT_BY,
   MENU_MAIN_ENTRY_MORE,
   MENU_MAIN_ENTRY_ADHOC,
+  MENU_MAIN_ENTRY_LOCALSEND,
   MENU_MAIN_ENTRY_BOOKMARKS,
 };
 
@@ -92,7 +96,8 @@ MenuEntry menu_main_entries[] = {
   { SORT_BY,        13, CTX_FLAG_MORE, CTX_VISIBLE },
   { MORE,           14, CTX_FLAG_MORE, CTX_INVISIBLE },
   { ADHOC_TRANSFER, 16, CTX_FLAG_MORE, CTX_INVISIBLE },
-  { BOOKMARKS,      17, CTX_FLAG_MORE, CTX_INVISIBLE },
+  { LOCALSEND_TRANSFER, 17, CTX_FLAG_MORE, CTX_INVISIBLE },
+  { BOOKMARKS,      18, CTX_FLAG_MORE, CTX_INVISIBLE },
 };
 
 #define N_MENU_MAIN_ENTRIES (sizeof(menu_main_entries) / sizeof(MenuEntry))
@@ -400,6 +405,7 @@ void setContextMenuMainVisibilities() {
     menu_main_entries[MENU_MAIN_ENTRY_DELETE].visibility = CTX_INVISIBLE;
     menu_main_entries[MENU_MAIN_ENTRY_RENAME].visibility = CTX_INVISIBLE;
     menu_main_entries[MENU_MAIN_ENTRY_PROPERTIES].visibility = CTX_INVISIBLE;
+    menu_main_entries[MENU_MAIN_ENTRY_LOCALSEND].visibility = CTX_INVISIBLE;
   }
 
   // Invisible 'Paste' if nothing is copied yet
@@ -416,6 +422,7 @@ void setContextMenuMainVisibilities() {
     menu_main_entries[MENU_MAIN_ENTRY_DELETE].visibility = CTX_INVISIBLE;
     menu_main_entries[MENU_MAIN_ENTRY_RENAME].visibility = CTX_INVISIBLE;
     menu_main_entries[MENU_MAIN_ENTRY_NEW].visibility = CTX_INVISIBLE;
+    menu_main_entries[MENU_MAIN_ENTRY_LOCALSEND].visibility = CTX_INVISIBLE;
   }
 
   // Mark/Unmark all text
@@ -1075,6 +1082,19 @@ static int contextMenuMainEnterCallback(int sel, void *context) {
       setContextMenu(&context_menu_adhoc);
       setContextMenuAdhocVisibilities();
       return CONTEXT_MENU_MORE_OPENING;
+    }
+
+    case MENU_MAIN_ENTRY_LOCALSEND:
+    {
+      FileListEntry *file_entry = fileListGetNthEntry(&file_list, base_pos + rel_pos);
+      if (file_entry) {
+        if (mark_list.length == 0) {
+          fileListAddEntry(&mark_list, fileListCopyEntry(file_entry), 1);
+          added_mark = 1;
+        }
+        initLocalSendDialog();
+      }
+      break;
     }
   }
 

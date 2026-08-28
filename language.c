@@ -281,7 +281,8 @@ void loadLanguage(int id) {
     LANGUAGE_ENTRY(ARCHIVE_NAME),
     LANGUAGE_ENTRY(COMPRESSION_LEVEL),
     LANGUAGE_ENTRY(ENTER_PASSWORD),
-    LANGUAGE_ENTRY(BOOKMARK_CREATED)
+    LANGUAGE_ENTRY(BOOKMARK_CREATED),
+    LANGUAGE_ENTRY(LOCALSEND_TRANSFER)
   };
 
   // Load default config file
@@ -296,4 +297,6 @@ void loadLanguage(int id) {
       readConfig(path, language_entries, sizeof(language_entries) / sizeof(ConfigEntry));
     }
   }
+
+  if (!language_container[LOCALSEND_TRANSFER]) language_container[LOCALSEND_TRANSFER] = strdup("LocalSend");
 }

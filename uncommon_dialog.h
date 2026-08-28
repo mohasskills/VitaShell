@@ -1,3 +1,4 @@
+#include <psp2/message_dialog.h>
 /*
   VitaShell
   Copyright (C) 2015-2018, TheFloW

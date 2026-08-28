@@ -104,7 +104,7 @@ static void calculateDialogBoxSize() {
   // Progress bar box width
   if (uncommon_dialog.mode == SCE_MSG_DIALOG_MODE_PROGRESS_BAR) {
     uncommon_dialog.width = UNCOMMON_DIALOG_PROGRESS_BAR_BOX_WIDTH;
-    uncommon_dialog.height += 2.0f * FONT_Y_SPACE;
+    uncommon_dialog.height += 3.0f * FONT_Y_SPACE;
   }
   
   if (uncommon_dialog.mode == MSG_DIALOG_MODE_QR_SCAN) {
@@ -306,13 +306,7 @@ int drawUncommonDialog() {
   if (uncommon_dialog.dialog_status == UNCOMMON_DIALOG_OPENED) {
     float string_y = uncommon_dialog.y + SHELL_MARGIN_Y - 2.0f;
 
-    // Draw info
-    if (uncommon_dialog.mode == SCE_MSG_DIALOG_MODE_PROGRESS_BAR) {
-      if (uncommon_dialog.info[0] != '\0') {
-        float x = ALIGN_RIGHT(uncommon_dialog.x + uncommon_dialog.width - SHELL_MARGIN_X, pgf_text_width(uncommon_dialog.info));
-        pgf_draw_text(x, string_y, DIALOG_COLOR, uncommon_dialog.info);
-      }
-    }
+
 
     // Draw message
     int len = strlen(uncommon_dialog.msg);
@@ -360,8 +354,16 @@ int drawUncommonDialog() {
 
     // Progress bar
     if (uncommon_dialog.mode == SCE_MSG_DIALOG_MODE_PROGRESS_BAR) {
+      string_y += FONT_Y_SPACE; // Breathing room
+
       float width = uncommon_dialog.width - 2.0f * SHELL_MARGIN_X;
       float x = uncommon_dialog.x + SHELL_MARGIN_X;
+      
+      if (uncommon_dialog.info[0] != '\0') {
+        float info_width = pgf_text_width(uncommon_dialog.info);
+        pgf_draw_text(x + width - info_width, string_y - FONT_Y_SPACE, DIALOG_COLOR, uncommon_dialog.info);
+      }
+
       vita2d_draw_rectangle(x, string_y + 10.0f, width, UNCOMMON_DIALOG_PROGRESS_BAR_HEIGHT, PROGRESS_BAR_BG_COLOR);
       vita2d_draw_rectangle(x, string_y + 10.0f, uncommon_dialog.progress * width / 100.0f, UNCOMMON_DIALOG_PROGRESS_BAR_HEIGHT, PROGRESS_BAR_COLOR);
 

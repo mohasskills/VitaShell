@@ -88,6 +88,19 @@ void infoDialog(const char *msg, ...) {
   setDialogStep(DIALOG_STEP_INFO);
 }
 
+void truncate_string_for_dialog(char *dest, const char *src, float max_width) {
+    strncpy(dest, src, 127);
+    dest[127] = '\0';
+    if (pgf_text_width(dest) <= max_width) return;
+
+    float ellipsis_width = pgf_text_width("...");
+    int len = strlen(dest);
+    while (len > 0 && pgf_text_width(dest) + ellipsis_width > max_width) {
+        dest[--len] = '\0';
+    }
+    strcat(dest, "...");
+}
+
 int checkMemoryCardFreeSpace(const char *path, uint64_t size) {
   char device[8];
   uint64_t free_size = 0, max_size = 0, extra_space = 0;

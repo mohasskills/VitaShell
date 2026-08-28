@@ -177,6 +177,9 @@ enum DialogSteps {
 
   DIALOG_STEP_FTP_WAIT,
   DIALOG_STEP_FTP,
+  
+  DIALOG_STEP_LOCALSEND,
+  DIALOG_STEP_LOCALSEND_SEND,
 
   DIALOG_STEP_USB_WAIT,
   DIALOG_STEP_USB,
@@ -253,7 +256,7 @@ enum DialogSteps {
 extern vita2d_pgf *font;
 extern char font_size_cache[256];
 
-extern char vita_ip[16];
+extern char vita_ip[64];
 extern unsigned short int vita_port;
 
 extern VitaShellConfig vitashell_config;

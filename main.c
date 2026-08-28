@@ -37,16 +37,21 @@
 #include "adhoc_dialog.h"
 #include "property_dialog.h"
 #include "message_dialog.h"
+#include "uncommon_dialog.h"
 #include "netcheck_dialog.h"
 #include "ime_dialog.h"
 #include "theme.h"
 #include "language.h"
 #include "utils.h"
+#include "localsend_server.h"
+#include "localsend_sender.h"
+#include "browser.h"
 #include "sfo.h"
 #include "coredump.h"
 #include "usb.h"
 #include "qr.h"
 #include "pfs.h"
+#include "localsend_server.h"
 
 int _newlib_heap_size_user = 128 * 1024 * 1024;
 
@@ -59,7 +64,7 @@ static SceUID usbdevice_modid = -1;
 
 static SceKernelLwMutexWork dialog_mutex;
 
-char vita_ip[16];
+char vita_ip[64];
 unsigned short int vita_port;
 
 VitaShellConfig vitashell_config;
@@ -134,7 +139,7 @@ void drawShellInfo(const char *path) {
   SceDateTime time;
   sceRtcGetCurrentClock(&time, 0);
 
-  char date_string[16];
+  char date_string[24];
   getDateString(date_string, date_format, &time);
 
   char time_string[24];
@@ -255,6 +260,13 @@ int dialogSteps() {
   int msg_result = updateMessageDialog();
   int netcheck_result = updateNetCheckDialog();
   int ime_result = updateImeDialog();
+
+  if (getDialogStep() == DIALOG_STEP_NONE && incoming_request_pending && !active_upload.is_active) {
+    char prompt[512];
+    snprintf(prompt, sizeof(prompt), "Incoming LocalSend transfer from %s\n%d file(s)\nAccept?", pending_sender_alias, pending_file_count);
+    initMessageDialog(SCE_MSG_DIALOG_BUTTON_TYPE_YESNO, prompt);
+    setDialogStep(DIALOG_STEP_LOCALSEND);
+  }
 
   switch (getDialogStep()) {
     case DIALOG_STEP_ERROR:
@@ -456,6 +468,106 @@ int dialogSteps() {
         ftpvita_fini();
         refresh = REFRESH_MODE_NORMAL;
         setDialogStep(DIALOG_STEP_NONE);
+      }
+
+      break;
+    }
+    
+    case DIALOG_STEP_LOCALSEND:
+    {
+      static int localsend_is_progress = 0;
+
+      if (msg_result == MESSAGE_DIALOG_RESULT_YES) {
+        // Update save destination to current directory
+        strncpy(save_destination, file_list.path, sizeof(save_destination));
+        save_destination[sizeof(save_destination) - 1] = '\0';
+        
+        // User accepted the transfer
+        server_accept_incoming();
+        char short_name[128];
+        truncate_string_for_dialog(short_name, pending_sender_alias, 250.0f);
+        initMessageDialog(MESSAGE_DIALOG_PROGRESS_BAR, "Receiving %d file(s) from:\n%s", pending_file_count, short_name);
+        localsend_is_progress = 1;
+        powerLock(); // Lock power during active transfer
+      } else if (msg_result == MESSAGE_DIALOG_RESULT_NO) {
+        // User rejected the transfer
+        server_reject_incoming();
+        setDialogStep(DIALOG_STEP_NONE);
+        localsend_is_progress = 0;
+      } else if (msg_result == MESSAGE_DIALOG_RESULT_RUNNING) {
+        if (!current_session.is_active && localsend_is_progress) {
+          sceMsgDialogClose(); // Close progress bar when transfer finishes
+        } else if (active_upload.is_active && localsend_is_progress) {
+          char msg[256];
+          char info[64];
+          char short_name[128];
+          truncate_string_for_dialog(short_name, active_upload.safe_name, 250.0f);
+          int progress = (int)(((uint64_t)current_session.cumulative_bytes_received * 100) / (current_session.total_bytes_expected > 0 ? (uint64_t)current_session.total_bytes_expected : 1));
+          snprintf(msg, sizeof(msg), "Receiving:\n%s", short_name);
+          snprintf(info, sizeof(info), "%.1f KB/s", active_upload.speed_kbps);
+          sceMsgDialogProgressBarSetMsg(SCE_MSG_DIALOG_PROGRESSBAR_TARGET_BAR_DEFAULT, (const SceChar8 *)msg);
+          sceMsgDialogProgressBarSetInfo(SCE_MSG_DIALOG_PROGRESSBAR_TARGET_BAR_DEFAULT, (const SceChar8 *)info);
+          sceMsgDialogProgressBarSetValue(SCE_MSG_DIALOG_PROGRESSBAR_TARGET_BAR_DEFAULT, progress);
+        }
+      } else if (msg_result == MESSAGE_DIALOG_RESULT_FINISHED || msg_result == MESSAGE_DIALOG_RESULT_NONE) {
+        // Dialog closed organically (transfer finished, or error)
+        if (localsend_is_progress) {
+          powerUnlock(); // Unlock power since transfer is done
+          refresh = REFRESH_MODE_NORMAL;
+          
+          if (active_upload.is_active || current_session.is_active) {
+            // User closed the dialog manually before completion!
+            active_upload.cancel_requested = 1;
+            if (active_upload.client_sock >= 0) {
+                sceNetSocketClose(active_upload.client_sock);
+                active_upload.client_sock = -1;
+            }
+            snprintf(server_status_msg, sizeof(server_status_msg), "Cancelled by user");
+          }
+
+          // Show the result (Done, or Cancelled)
+          initMessageDialog(SCE_MSG_DIALOG_BUTTON_TYPE_OK, "%s", server_status_msg);
+          setDialogStep(DIALOG_STEP_INFO);
+
+          localsend_is_progress = 0;
+        }
+      }
+
+      break;
+    }
+    
+    case DIALOG_STEP_LOCALSEND_SEND:
+    {
+      if (msg_result == MESSAGE_DIALOG_RESULT_NO) {
+        // Cancel requested
+        sender_cancel();
+        refresh = REFRESH_MODE_NORMAL;
+        setDialogStep(DIALOG_STEP_NONE);
+      } else if (msg_result == MESSAGE_DIALOG_RESULT_RUNNING) {
+        if (active_send.state == SEND_STATE_DONE || active_send.state == SEND_STATE_ERROR) {
+          sceMsgDialogClose();
+        } else {
+          char msg[256];
+          char info[64];
+          char short_name[128];
+          truncate_string_for_dialog(short_name, active_send.current_name, 250.0f);
+          int progress = (int)(((uint64_t)active_send.bytes_sent_all_files * 100) / (active_send.bytes_total_all_files > 0 ? (uint64_t)active_send.bytes_total_all_files : 1));
+          snprintf(msg, sizeof(msg), "Sending:\n%s", short_name);
+          snprintf(info, sizeof(info), "%.1f KB/s", active_send.speed_kbps);
+          sceMsgDialogProgressBarSetMsg(SCE_MSG_DIALOG_PROGRESSBAR_TARGET_BAR_DEFAULT, (const SceChar8 *)msg);
+          sceMsgDialogProgressBarSetInfo(SCE_MSG_DIALOG_PROGRESSBAR_TARGET_BAR_DEFAULT, (const SceChar8 *)info);
+          sceMsgDialogProgressBarSetValue(SCE_MSG_DIALOG_PROGRESSBAR_TARGET_BAR_DEFAULT, progress);
+        }
+      } else if (msg_result == MESSAGE_DIALOG_RESULT_FINISHED || msg_result == MESSAGE_DIALOG_RESULT_NONE) {
+        if (active_send.state == SEND_STATE_DONE || active_send.state == SEND_STATE_ERROR) {
+          initMessageDialog(SCE_MSG_DIALOG_BUTTON_TYPE_OK, "%s", active_send.status_msg);
+          setDialogStep(DIALOG_STEP_INFO);
+          sender_cancel();
+        } else {
+          sender_cancel();
+          refresh = REFRESH_MODE_NORMAL;
+          setDialogStep(DIALOG_STEP_NONE);
+        }
       }
 
       break;
@@ -1257,6 +1369,9 @@ int main(int argc, const char *argv[]) {
     if (thid >= 0)
       sceKernelStartThread(thid, 0, NULL);
   }
+
+  // LocalSend Daemon
+  server_init();
 
   // File browser
   browserMain();

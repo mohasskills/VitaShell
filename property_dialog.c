@@ -299,7 +299,7 @@ int initPropertyDialog(char *path, FileListEntry *entry) {
   }
 
   // Dates
-  char date_string[16];
+  char date_string[24];
   char time_string[24];
   char string[64];
 

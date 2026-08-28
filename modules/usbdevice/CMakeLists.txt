@@ -11,7 +11,7 @@ endif()
 project(usbdevice)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-q -Wall -O3 -nostdlib")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-q -Wall -O3 -std=gnu11 -Wno-error=incompatible-pointer-types -Wno-incompatible-pointer-types -Wno-strict-prototypes -Wno-error=strict-prototypes -nostdlib")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions")
 
 add_executable(usbdevice

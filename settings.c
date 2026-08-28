@@ -96,6 +96,8 @@ void saveSettingsConfig() {
 
   if (sceKernelGetModel() == SCE_KERNEL_MODEL_VITATV) {
     vitashell_config.select_button = SELECT_BUTTON_MODE_FTP;
+  } else if (vitashell_config.select_button > SELECT_BUTTON_MODE_FTP) {
+    vitashell_config.select_button = SELECT_BUTTON_MODE_USB;
   }
 }
 

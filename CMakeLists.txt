@@ -17,7 +17,7 @@ set(VITA_TITLEID  "VITASHELL")
 set(VITA_VERSION  "02.02")
 
 # Flags and includes
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O3 -Wno-unused-variable -Wno-unused-but-set-variable -Wno-format-truncation -fno-lto")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O3 -std=gnu11 -Wno-error=incompatible-pointer-types -Wno-incompatible-pointer-types -Wno-strict-prototypes -Wno-error=strict-prototypes -Wno-unused-variable -Wno-unused-but-set-variable -Wno-format-truncation -fno-lto")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c+ + 11 -fno-rtti -fno-exceptions")
 set(VITA_MKSFOEX_FLAGS "${VITA_MKSFOEX_FLAGS} -d PARENTAL_LEVEL=1")
 set(VITA_MAKE_FSELF_FLAGS "${VITA_MAKE_FSELF_FLAGS} -a 0x2808000000000000")
@@ -30,6 +30,7 @@ add_subdirectory(modules/usbdevice)
 include_directories(
   modules/kernel
   modules/user
+  cJSON
 )
 
 link_directories(
@@ -105,6 +106,11 @@ add_executable(VitaShell
   coredump.c
   settings.c
   adhoc_dialog.c
+  localsend_dialog.c
+  localsend_server.c
+  localsend_discovery.c
+  localsend_sender.c
+  cJSON/cJSON.c
   property_dialog.c
   uncommon_dialog.c
   message_dialog.c
@@ -140,10 +146,10 @@ add_executable(VitaShell
 )
 
 add_dependencies(VitaShell vitashell_user_stubs)
-add_dependencies(VitaShell kernel.skprx)
-add_dependencies(VitaShell user.suprx)
-add_dependencies(VitaShell patch.skprx)
-add_dependencies(VitaShell usbdevice.skprx)
+add_dependencies(VitaShell kernel.skprx-self)
+add_dependencies(VitaShell user.suprx-self)
+add_dependencies(VitaShell patch.skprx-self)
+add_dependencies(VitaShell usbdevice.skprx-self)
 
 target_link_libraries(VitaShell
   ${CMAKE_CURRENT_BINARY_DIR}/modules/user/vitashell_user_stubs/libVitaShellUser_stub_weak.a
@@ -160,6 +166,7 @@ target_link_libraries(VitaShell
   quirc
   onigmo
   archive
+  zstd
   bz2
   lzma
   crypto

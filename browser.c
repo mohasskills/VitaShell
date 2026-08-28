@@ -43,6 +43,10 @@
 #include "sfo.h"
 #include "coredump.h"
 #include "usb.h"
+#include "localsend_server.h"
+#include "localsend_discovery.h"
+#include "localsend_dialog.h"
+#include "localsend_sender.h"
 #include "qr.h"
 #include "pfs.h"
 
@@ -809,14 +813,26 @@ int browserMain() {
   while (1) {
     readPad();
 
+    server_poll();
+    sender_poll();
+    discovery_poll();
+    
+    static int frame_count = 0;
+    if (frame_count % 60 == 0) {
+      discovery_broadcast();
+    }
+    frame_count++;
+
     int refresh = REFRESH_MODE_NONE;
 
     // Control
-    if (getDialogStep() != DIALOG_STEP_NONE) {
+    if (getDialogStep() != DIALOG_STEP_NONE || incoming_request_pending) {
       refresh = dialogSteps();
       // scroll_count = 0;
     } else if (getAdhocDialogStatus() != ADHOC_DIALOG_CLOSED) {
       adhocDialogCtrl();
+    } else if (getLocalSendDialogStatus() != LOCALSEND_DIALOG_CLOSED) {
+      localsendDialogCtrl();
     } else if (getPropertyDialogStatus() != PROPERTY_DIALOG_CLOSED) {
       propertyDialogCtrl();
       scroll_count = 0;
@@ -1003,7 +1019,7 @@ int browserMain() {
           }
 
           // Date
-          char date_string[16];
+          char date_string[24];
           getDateString(date_string, date_format, &file_entry->mtime);
 
           char time_string[24];
@@ -1025,6 +1041,7 @@ int browserMain() {
     drawSettingsMenu();
     drawContextMenu();
     drawAdhocDialog();
+    drawLocalSendDialog();
     drawPropertyDialog();
 
     // End drawing
